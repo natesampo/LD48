@@ -334,8 +334,8 @@ function renderScreen(screen) {
 							let xPos = (obj.x - camera.x) * tileSize;
 							let yPos = (obj.y - camera.y) * tileSize;
 
-							let frameSizeX = objSpriteData[3] * tileSize;
-							let frameSizeY = objSpriteData[4] * tileSize;
+							let frameSizeX = objSpriteData[3] * level.tileSize;
+							let frameSizeY = objSpriteData[4] * level.tileSize;
 
 							let animationFrames = objSpriteData[5];
 
@@ -351,8 +351,8 @@ function renderScreen(screen) {
 								context.globalAlpha = obj.opacity;
 							}
 
-							context.drawImage(sprite, ((obj.animationFrame << 0) * objSpriteData[3] + objSpriteData[1]) * tileSize, objSpriteData[2] * tileSize, frameSizeX, frameSizeY,
-												xPos, yPos, frameSizeX, frameSizeY);
+							context.drawImage(sprite, ((obj.animationFrame << 0) * objSpriteData[3] + objSpriteData[1]) * level.tileSize, objSpriteData[2] * level.tileSize, frameSizeX, frameSizeY,
+												xPos, yPos, frameSizeX * camera.zoomLevel, frameSizeY * camera.zoomLevel);
 
 							obj.animationFrame = (obj.animationFrame + obj.animationSpeed) % animationFrames;
 
