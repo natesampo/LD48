@@ -352,7 +352,7 @@ function renderScreen(screen) {
 							}
 
 							context.drawImage(sprite, ((obj.animationFrame << 0) * objSpriteData[3] + objSpriteData[1]) * tileSize, objSpriteData[2] * tileSize, frameSizeX, frameSizeY,
-												xPos, yPos, tileSize, tileSize);
+												xPos, yPos, frameSizeX, frameSizeY);
 
 							obj.animationFrame = (obj.animationFrame + obj.animationSpeed) % animationFrames;
 
