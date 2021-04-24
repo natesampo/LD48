@@ -175,7 +175,7 @@ function launchLevelEditor() {
 							previewTile.sprite[3] = (isNaN(parseInt(data[2]))) ? 1 : parseInt(data[2]);
 							previewTile.sprite[4] = (isNaN(parseInt(data[3]))) ? 1 : parseInt(data[3]);
 							previewTile.sprite[5] = (isNaN(parseInt(data[4]))) ? 1 : parseInt(data[4]);
-							previewTile.animationSpeed = (isNaN(parseInt(data[5]))) ? 0 : parseInt(data[5]);
+							previewTile.animationSpeed = (isNaN(parseFloat(data[5]))) ? 0 : parseFloat(data[5]);
 							previewTile.angle = 0;
 						} else {
 							previewTile.sprite[1] = 0;
@@ -378,7 +378,7 @@ function launchLevelEditor() {
 								previewTile.sprite[3] = (isNaN(parseInt(data[2]))) ? 1 : parseInt(data[2]);
 								previewTile.sprite[4] = (isNaN(parseInt(data[3]))) ? 1 : parseInt(data[3]);
 								previewTile.sprite[5] = (isNaN(parseInt(data[4]))) ? 1 : parseInt(data[4]);
-								previewTile.animationSpeed = (isNaN(parseInt(data[5]))) ? 0 : parseInt(data[5]);
+								previewTile.animationSpeed = (isNaN(parseFloat(data[5]))) ? 0 : parseFloat(data[5]);
 								previewTile.angle = 0;
 							} else {
 								previewTile.sprite[1] = 0;
