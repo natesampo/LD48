@@ -145,6 +145,10 @@ function launchLevelEditor() {
 
 		let previewTile = new GameObject(0, 0, [undefined, 0, 0, 1], 0, 0);
 		previewTile.opacity = 0.4;
+		previewTile.isTile = true;
+		previewTile.collideable = false;
+		previewTile.playable = false;
+		previewTile.speed = 0;
 
 		let comboRules = {};
 		let savedTiles = [];
@@ -341,6 +345,38 @@ function launchLevelEditor() {
 			}
 		}));
 
+		buttons.push(new UIButton(canvas.width - 80, 84, 64, 64, undefined, 'Placing - Tile', function(which) {
+			previewTile.isTile = !previewTile.isTile;
+			if (previewTile.isTile) {
+				this.text = 'Placing - Tile';
+			} else {
+				this.text = 'Placing - Object';
+			}
+		}));
+
+		buttons.push(new UIButton(canvas.width - 80, 152, 64, 64, undefined, 'Collision OFF', function(which) {
+			previewTile.collideable = !previewTile.collideable;
+			if (previewTile.collideable) {
+				this.text = 'Collision ON';
+			} else {
+				this.text = 'Collision OFF';
+			}
+		}));
+
+		buttons.push(new UIButton(canvas.width - 80, 220, 64, 64, undefined, 'Literally Unplayable', function(which) {
+			previewTile.playable = !previewTile.playable;
+			if (previewTile.playable) {
+				this.text = 'Playable';
+			} else {
+				this.text = 'Literally Unplayable';
+			}
+		}));
+
+		buttons.push(new UIButton(canvas.width - 80, 288, 64, 64, undefined, 'Speed: 0', function(which) {
+			previewTile.speed = parseFloat(window.prompt('Speed', '0'));
+			this.text = 'Speed: ' + previewTile.speed;
+		}));
+
 		let spriteCanvi = document.getElementsByClassName('spriteCanvas');
 		spriteButtons.push(new UIButton(canvas.width - 148, 16 + 68 * spriteCanvi.length, 64, 64, undefined, 'New Sprite', function(which) {
 			if (which == 1) {
@@ -445,26 +481,31 @@ function launchLevelEditor() {
 					dragging[1] = true;
 					lastPos[0] = tileX;
 					lastPos[1] = tileY;
-					let newTile = new Tile(tileX, tileY, copyArray(previewTile.sprite), previewTile.angle, previewTile.animationSpeed);
-					level.addObject(newTile);
+					if (previewTile.isTile) {
+						let newTile = new Tile(tileX, tileY, copyArray(previewTile.sprite), previewTile.angle, previewTile.animationSpeed);
+						level.addObject(newTile);
 
-					let tile0 = level.getXYTile(tileX + 1, tileY);
-					let tile1 = level.getXYTile(tileX + 1, tileY + 1);
-					let tile2 = level.getXYTile(tileX, tileY + 1);
-					let tile3 = level.getXYTile(tileX - 1, tileY + 1);
-					let tile4 = level.getXYTile(tileX - 1, tileY);
-					let tile5 = level.getXYTile(tileX - 1, tileY - 1);
-					let tile6 = level.getXYTile(tileX, tileY - 1);
-					let tile7 = level.getXYTile(tileX + 1, tileY - 1);
+						let tile0 = level.getXYTile(tileX + 1, tileY);
+						let tile1 = level.getXYTile(tileX + 1, tileY + 1);
+						let tile2 = level.getXYTile(tileX, tileY + 1);
+						let tile3 = level.getXYTile(tileX - 1, tileY + 1);
+						let tile4 = level.getXYTile(tileX - 1, tileY);
+						let tile5 = level.getXYTile(tileX - 1, tileY - 1);
+						let tile6 = level.getXYTile(tileX, tileY - 1);
+						let tile7 = level.getXYTile(tileX + 1, tileY - 1);
 
-					applyComboRule(newTile, tile0, comboRules, level);
-					applyComboRule(newTile, tile1, comboRules, level);
-					applyComboRule(newTile, tile2, comboRules, level);
-					applyComboRule(newTile, tile3, comboRules, level);
-					applyComboRule(newTile, tile4, comboRules, level);
-					applyComboRule(newTile, tile5, comboRules, level);
-					applyComboRule(newTile, tile6, comboRules, level);
-					applyComboRule(newTile, tile7, comboRules, level);
+						applyComboRule(newTile, tile0, comboRules, level);
+						applyComboRule(newTile, tile1, comboRules, level);
+						applyComboRule(newTile, tile2, comboRules, level);
+						applyComboRule(newTile, tile3, comboRules, level);
+						applyComboRule(newTile, tile4, comboRules, level);
+						applyComboRule(newTile, tile5, comboRules, level);
+						applyComboRule(newTile, tile6, comboRules, level);
+						applyComboRule(newTile, tile7, comboRules, level);
+					} else {
+						level.addObject(new GameObject(tileX, tileY, copyArray(previewTile.sprite), previewTile.angle, previewTile.animationSpeed, previewTile.collideable,
+														previewTile.playable, previewTile.speed));
+					}
 				}
 			} else if (which == 3) {
 				for (var i=0; i<game.screens[0].ui.length; i++) {
@@ -517,26 +558,31 @@ function launchLevelEditor() {
 				lastPos[0] = tileX;
 				lastPos[1] = tileY;
 
-				let newTile = new Tile(tileX, tileY, copyArray(previewTile.sprite), previewTile.angle, previewTile.animationSpeed);
-				level.addObject(newTile);
+				if (previewTile.isTile) {
+					let newTile = new Tile(tileX, tileY, copyArray(previewTile.sprite), previewTile.angle, previewTile.animationSpeed);
+					level.addObject(newTile);
 
-				let tile0 = level.getXYTile(tileX + 1, tileY);
-				let tile1 = level.getXYTile(tileX + 1, tileY + 1);
-				let tile2 = level.getXYTile(tileX, tileY + 1);
-				let tile3 = level.getXYTile(tileX - 1, tileY + 1);
-				let tile4 = level.getXYTile(tileX - 1, tileY);
-				let tile5 = level.getXYTile(tileX - 1, tileY - 1);
-				let tile6 = level.getXYTile(tileX, tileY - 1);
-				let tile7 = level.getXYTile(tileX + 1, tileY - 1);
+					let tile0 = level.getXYTile(tileX + 1, tileY);
+					let tile1 = level.getXYTile(tileX + 1, tileY + 1);
+					let tile2 = level.getXYTile(tileX, tileY + 1);
+					let tile3 = level.getXYTile(tileX - 1, tileY + 1);
+					let tile4 = level.getXYTile(tileX - 1, tileY);
+					let tile5 = level.getXYTile(tileX - 1, tileY - 1);
+					let tile6 = level.getXYTile(tileX, tileY - 1);
+					let tile7 = level.getXYTile(tileX + 1, tileY - 1);
 
-				applyComboRule(newTile, tile0, comboRules, level);
-				applyComboRule(newTile, tile1, comboRules, level);
-				applyComboRule(newTile, tile2, comboRules, level);
-				applyComboRule(newTile, tile3, comboRules, level);
-				applyComboRule(newTile, tile4, comboRules, level);
-				applyComboRule(newTile, tile5, comboRules, level);
-				applyComboRule(newTile, tile6, comboRules, level);
-				applyComboRule(newTile, tile7, comboRules, level);
+					applyComboRule(newTile, tile0, comboRules, level);
+					applyComboRule(newTile, tile1, comboRules, level);
+					applyComboRule(newTile, tile2, comboRules, level);
+					applyComboRule(newTile, tile3, comboRules, level);
+					applyComboRule(newTile, tile4, comboRules, level);
+					applyComboRule(newTile, tile5, comboRules, level);
+					applyComboRule(newTile, tile6, comboRules, level);
+					applyComboRule(newTile, tile7, comboRules, level);
+				} else {
+					level.addObject(new GameObject(tileX, tileY, copyArray(previewTile.sprite), previewTile.angle, previewTile.animationSpeed, previewTile.collideable,
+													previewTile.playable, previewTile.speed));
+				}
 			} else if (dragging[3] && (lastPos[0] != tileX || lastPos[1] != tileY)) {
 				lastPos[0] = tileX;
 				lastPos[1] = tileY;

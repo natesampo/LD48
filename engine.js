@@ -5,7 +5,7 @@ class Tile {
 		this.sprite = sprite;
 		this.angle = angle;
 		this.animationFrame = 0;
-		this.animationSpeed = animationSpeed ? animationSpeed : 0;
+		this.animationSpeed = animationSpeed;
 	}
 
 	toString() {
@@ -15,13 +15,21 @@ class Tile {
 }
 
 class GameObject {
-	constructor(x, y, sprite, angle, animationSpeed) {
+	constructor(x, y, sprite, angle, animationSpeed, collideable, playable, speed) {
 		this.x = x;
 		this.y = y;
 		this.sprite = sprite;
 		this.angle = angle;
+		this.animationSpeed = animationSpeed;
+		this.collideable = collideable;
+		this.playable = playable;
+		this.speed = speed;
+
 		this.animationFrame = 0;
-		this.animationSpeed = animationSpeed ? animationSpeed : 0;
+		this.targetX = x;
+		this.targetY = y;
+		this.bias = 0;
+		this.biasUp = true;
 	}
 
 	translate(x, y) {
@@ -29,9 +37,47 @@ class GameObject {
 		this.y += y;
 	}
 
+	tick(level) {
+		if (this.speed != 0) {
+			let dist = getDistance(this.x, this.y, this.targetX, this.targetY);
+			if (dist > 0.5) {
+				let weights = level.getCollideable(this, this.bias, this.bias, 2, 2);
+
+				let a = this.targetY - this.y;
+				let b = this.targetX - this.x;
+				let theta = Math.atan2(a, b);
+				let closeToDiag = Math.abs(Math.sin(2 * theta)) / 3 + 1;
+				theta *= 180 / Math.PI;
+				if (theta < 0) theta = 360 + theta;
+				let ind = theta / 45;
+				let remainder = ind - (ind << 0);
+				let rounded = ind << 0;
+				weights[rounded] += 1.5 * (1 - remainder);
+				weights[(rounded + 1) % 8] += 1.5 * remainder;
+
+				let weightX = weights[0] + weights[1]/2 + weights[7]/2 - weights[3]/2 - weights[4] - weights[5]/2;
+				let weightY = weights[1]/2 + weights[2] + weights[3]/2 - weights[5]/2 - weights[6] - weights[7]/2;
+
+				let sum = Math.abs(weightX) + Math.abs(weightY);
+
+				let moveX = this.speed * closeToDiag * (weightX / sum);
+				let moveY = this.speed * closeToDiag * (weightY / sum);
+
+				level.translateObject(this, moveX, moveY);
+
+				this.bias += this.biasUp ? 0.005 : -0.005;
+
+				if (Math.abs(this.bias) >= 0.5) {
+					this.biasUp = !this.biasUp;
+				}
+			}
+		}
+	}
+
 	toString() {
 		return 'o ' + this.sprite[0] + ' ' + this.sprite[1].toString() + ' ' + this.sprite[2].toString() + ' ' + this.sprite[3].toString() + ' ' + this.sprite[4].toString()
-					+ ' ' + this.sprite[5].toString() + ' ' + this.animationSpeed.toString() + ' ' + this.x.toString() + ' ' + this.y.toString() + ' ' + this.angle.toString();
+					+ ' ' + this.sprite[5].toString() + ' ' + this.animationSpeed.toString() + ' ' + this.x.toString() + ' ' + this.y.toString() + ' ' + this.angle.toString()
+					+ ' ' + this.collideable.toString() + ' ' + this.playable.toString() + ' ' + this.speed.toString();
 	}
 }
 
@@ -68,8 +114,30 @@ class Level {
 		this.sprites = sprites;
 
 		this.map = {};
+		this.playable = [];
 		for (var i=0; i<objects.length; i++) {
-			this.putInMap(objects[i]);
+			let object = objects[i];
+			this.putInMap(object);
+			if (object.playable) {
+				this.playable.push(object);
+			}
+		}
+	}
+
+	tick() {
+		let tickOrder = [];
+		for (var i in this.map) {
+			for (var j in this.map[i]) {
+				for (var k=this.map[i][j].length-1; k>=0; k--) {
+					if (this.map[i][j][k] instanceof GameObject) {
+						tickOrder.push(this.map[i][j][k]);
+					}
+				}
+			}
+		}
+
+		for (var i=0; i<tickOrder.length; i++) {
+			tickOrder[i].tick(this);
 		}
 	}
 
@@ -82,12 +150,16 @@ class Level {
 						break;
 					}
 				}
-				this.map[obj.x][obj.y].push(obj);
+				this.map[obj.x][obj.y].unshift(obj);
 			} else {
 				this.putInMap(obj);
 			}
 		} else {
 			this.putInMap(obj);
+
+			if (obj.playable) {
+				this.playable.push(obj);
+			}
 		}
 	}
 
@@ -117,6 +189,10 @@ class Level {
 	removeFromMap(obj) {
 		remove(this.map[obj.x << 0][obj.y << 0], obj);
 		this.checkXYForDeletion(obj.x << 0, obj.y << 0);
+
+		if (obj.playable) {
+			remove(this.playable, obj);
+		}
 	}
 
 	checkXYForDeletion(x, y) {
@@ -132,15 +208,45 @@ class Level {
 	}
 
 	putInMap(obj) {
-		if (!this.map[obj.x]) {
-			this.map[obj.x] = {};
+		let x = obj.x << 0;
+		let y = obj.y << 0;
+		if (!this.map[x]) {
+			this.map[x] = {};
 		}
 
-		if (this.map[obj.x][obj.y]) {
-			this.map[obj.x][obj.y].push(obj);
+		if (this.map[x][y]) {
+			this.map[x][y].push(obj);
 		} else {
-			this.map[obj.x][obj.y] = [obj];
+			this.map[x][y] = [obj];
 		}
+	}
+
+	getCollideable(obj, biasX, biasY, radiusX, radiusY) {
+		let weights = [0, 0, 0, 0, 0, 0, 0, 0];
+		let startX = obj.x + biasX - radiusX << 0;
+		let endX = obj.x + biasX + radiusX << 0;
+		let startY = obj.y + biasY - radiusY << 0;
+		let endY = obj.y + biasY + radiusY << 0;
+		for (var i=startX; i<=endX; i++) {
+			for (var j=startY; j<=endY; j++) {
+				if (this.map[i] && this.map[i][j]) {
+					for (var k=0; k<this.map[i][j].length; k++) {
+						let tempObj = this.map[i][j][k];
+						if (tempObj.collideable && tempObj != obj) {
+							let ind = getAngle(obj.x, obj.y, tempObj.x, tempObj.y) / 45;
+							let remainder = ind - (ind << 0);
+							let rounded = ind << 0;
+							let distVal = 1 / getDistance(obj.x, obj.y, tempObj.x, tempObj.y);
+							weights[rounded] -= distVal * (1 - remainder);
+							weights[(rounded + 1) % 8] -= distVal * remainder;
+							break;
+						}
+					}
+				}
+			}
+		}
+
+		return weights;
 	}
 
 	toString() {
@@ -181,6 +287,8 @@ class Screen {
 		this.level = level;
 		this.camera = camera;
 		this.ui = ui;
+
+		this.playableSelected = 0;
 	}
 
 	resize(newWidth, newHeight, pageWidth, pageHeight) {
@@ -255,6 +363,7 @@ function loadLevel(level, func) {
 			if (this.readyState === XMLHttpRequest.DONE) {
 				let levelColor;
 				let tileSize;
+				let sprite;
 				let objects = [];
 				let promises = {};
 				let levelText = this.responseText.split('\n');
@@ -268,7 +377,7 @@ function loadLevel(level, func) {
 							tileSize = parseInt(line[1]);
 							break;
 						case 't':
-							let sprite = document.getElementById(line[1]);
+							sprite = document.getElementById(line[1]);
 							if (!sprite) {
 								if (!promises[line[1]]) {
 									promises[line[1]] = (loadSprite(line[1], tileSize));
@@ -279,6 +388,19 @@ function loadLevel(level, func) {
 							// t sprite spriteX spriteY spriteWidth spriteHeight frames animationSpeed x y angle
 							objects.push(new Tile(parseInt(line[8]), parseInt(line[9]), [line[1], parseInt(line[2]), parseInt(line[3]), parseInt(line[4]), parseInt(line[5]), parseInt(line[6])],
 													parseInt(line[10]), parseFloat(line[7])));
+							break;
+						case 'o':
+							sprite = document.getElementById(line[1]);
+							if (!sprite) {
+								if (!promises[line[1]]) {
+									promises[line[1]] = (loadSprite(line[1], tileSize));
+								}
+							} else if (!sprites[line[1]]) {
+								sprites[line[1]] = sprite;
+							}
+							// o sprite spriteX spriteY spriteWidth spriteHeight frames animationSpeed x y angle collideable playable speed
+							objects.push(new GameObject(parseInt(line[8]), parseInt(line[9]), [line[1], parseInt(line[2]), parseInt(line[3]), parseInt(line[4]), parseInt(line[5]), parseInt(line[6])],
+													parseInt(line[10]), parseFloat(line[7]), line[11] == 'true', line[12] == 'true', parseFloat(line[13])));
 							break;
 					}
 				}
@@ -317,55 +439,73 @@ function renderScreen(screen) {
 									level.color['a'] + ')';
 	context.fillRect(0, 0, canvasWidth, canvasHeight);
 
+	let tilesToRender = [];
+	let objectsToRender = [];
+
 	let minXPos = camera.x << 0;
 	let maxXPos = camera.x + canvasWidth/tileSize << 0;
 	let minYPos = camera.y << 0;
 	let maxYPos = camera.y + canvasHeight/tileSize << 0;
-	for (var i=minXPos; i<=maxXPos; i++) {
-		if (level.map[i]) {
-			for (var j=minYPos; j<=maxYPos; j++) {
-				if (level.map[i][j]) {
-					for (var k=0; k<level.map[i][j].length; k++) {
-						let obj = level.map[i][j][k];
-						let objSpriteData = obj.sprite;
-						let sprite = level.sprites[objSpriteData[0]];
-
-						if (sprite) {
-							let xPos = (obj.x - camera.x) * tileSize;
-							let yPos = (obj.y - camera.y) * tileSize;
-
-							let frameSizeX = objSpriteData[3] * level.tileSize;
-							let frameSizeY = objSpriteData[4] * level.tileSize;
-
-							let animationFrames = objSpriteData[5];
-
-							if (obj.angle != 0) {
-								context.save();
-								context.translate(xPos + tileSize/2, yPos + tileSize/2);
-								context.rotate(obj.angle * Math.PI/180);
-								xPos = -tileSize/2;
-								yPos = -tileSize/2;
-							}
-
-							if (obj?.opacity != 1) {
-								context.globalAlpha = obj.opacity;
-							}
-
-							context.drawImage(sprite, ((obj.animationFrame << 0) * objSpriteData[3] + objSpriteData[1]) * level.tileSize, objSpriteData[2] * level.tileSize, frameSizeX, frameSizeY,
-												xPos, yPos, frameSizeX * camera.zoomLevel, frameSizeY * camera.zoomLevel);
-
-							obj.animationFrame = (obj.animationFrame + obj.animationSpeed) % animationFrames;
-
-							if (obj?.opacity != 1) {
-								context.globalAlpha = 1;
-							}
-
-							if (obj.angle != 0) {
-								context.restore();
-							}
-						}
+	for (var i=minYPos; i<=maxYPos; i++) {
+		for (var j=minXPos; j<=maxXPos; j++) {
+			if (level.map[j] && level.map[j][i]) {
+				for (var k=0; k<level.map[j][i].length; k++) {
+					let obj = level.map[j][i][k];
+					if (obj instanceof Tile) {
+						tilesToRender.push(obj);
+					} else if (obj instanceof GameObject) {
+						objectsToRender.push(obj);
 					}
 				}
+			}
+		}
+	}
+
+	let allToRender = tilesToRender.concat(objectsToRender);
+	let len = allToRender.length;
+	for (var i=0; i<len; i++) {
+		let obj = allToRender[i];
+		let objSpriteData = obj.sprite;
+		let sprite = level.sprites[objSpriteData[0]];
+
+		if (sprite) {
+			let xPos = (obj.x - camera.x) * tileSize;
+			let yPos = (obj.y - camera.y) * tileSize;
+
+			let frameSizeX = objSpriteData[3] * level.tileSize;
+			let frameSizeY = objSpriteData[4] * level.tileSize;
+
+			let animationFrames = objSpriteData[5];
+
+			let saved = false;
+			if (obj.angle != 0) {
+				saved = true;
+				context.save();
+				context.translate(xPos + tileSize/2, yPos + tileSize/2);
+				context.rotate(obj.angle * Math.PI/180);
+				xPos = -tileSize/2;
+				yPos = -tileSize/2;
+			}
+
+			if (obj?.opacity != 1) {
+				saved = true;
+				context.save();
+				context.globalAlpha = obj.opacity;
+			}
+
+			if (obj.targetX != undefined && obj.targetX < obj.x) {
+				saved = true;
+				context.translate(2 * xPos + sprite.width, 0);
+				context.scale(-1, 1);
+			}
+
+			context.drawImage(sprite, ((obj.animationFrame << 0) * objSpriteData[3] + objSpriteData[1]) * level.tileSize, objSpriteData[2] * level.tileSize, frameSizeX, frameSizeY,
+								xPos, yPos, frameSizeX * camera.zoomLevel, frameSizeY * camera.zoomLevel);
+
+			obj.animationFrame = (obj.animationFrame + obj.animationSpeed) % animationFrames;
+
+			if (saved) {
+				context.restore();
 			}
 		}
 	}
@@ -413,6 +553,7 @@ function renderScreen(screen) {
 function gameLoop(game) {
 	tick(game);
 	for (var i=0; i<game.screens.length; i++) {
+		game.screens[i].level.tick();
 		renderScreen(game.screens[i]);
 	}
 	render(game);
@@ -425,6 +566,8 @@ function start(game) {
 
 function launchExample() {
 	let game = new Game();
+	game.lastMouseX = 0;
+	game.lastMouseY = 0;
 	addInputs(game.inputs);
 	preventContextMenu();
 
@@ -441,6 +584,22 @@ function launchExample() {
 
 		game.screens.push(new Screen(canvas, context, 0, 0, 1, 1, level, new Camera(0, 0, 0, canvas.width/canvas.height, 1), []));
 		addMouseWheelListener(function(sign) {game.screens[0].camera.zoom(sign, game.screens[0].camera.x + (canvas.width/level.tileSize)/2, game.screens[0].camera.y + (canvas.height/level.tileSize)/2);});
+
+		addMouseDownListener(function(which, x, y) {
+			if (which == 3) {
+				game.screens[0].level.playable[game.screens[0].playableSelected].targetX = x / (level.tileSize * game.screens[0].camera.zoomLevel) + game.screens[0].camera.x << 0;
+				game.screens[0].level.playable[game.screens[0].playableSelected].targetY = y / (level.tileSize * game.screens[0].camera.zoomLevel) + game.screens[0].camera.y << 0;
+				game.lastMouseX = x;
+				game.lastMouseY = y;
+			}
+		});
+
+		addMouseMoveListener(function(x, y) {
+			if (game.inputs['mouse3']) {
+				game.lastMouseX = x;
+				game.lastMouseY = y;
+			}
+		});
 
 		start(game);
 	});
